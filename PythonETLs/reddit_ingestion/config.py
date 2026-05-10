@@ -22,6 +22,9 @@ COMMENT_BATCH_SIZE = 9999 # Max batch size for reddit comments API
 # Max retries for API requests
 MAX_API_RETRIES = 5
 
+# Max Threads for concurrent API requests (per subreddit)
+MAX_THREADS = 2
+
 # Fields to extract from reddit posts and comments
 POST_FIELDS = [
     'id',
