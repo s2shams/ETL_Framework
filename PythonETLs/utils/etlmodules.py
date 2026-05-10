@@ -1,8 +1,8 @@
-from etllogger import get_logger
+from .etllogger import get_logger
 import os
 import datetime
 from google.cloud import bigquery
-from etlconfig import (
+from .etlconfig import (
     get_project_id,
     get_BQ_client
 )

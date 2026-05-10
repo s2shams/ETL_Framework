@@ -11,6 +11,8 @@ SUBREDDITS = [
     'Ford'
 ]
 
+INGEST_FLOW_NAME = 'reddit_ingestion'
+
 # Base API URL for reddit posts
 POSTS_API_URL = 'https://arctic-shift.photon-reddit.com/api/posts/search'
 POST_BATCH_SIZE = 100 # Max batch size for reddit posts API
