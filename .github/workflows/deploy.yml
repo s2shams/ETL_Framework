@@ -1,0 +1,50 @@
+name: Deploy ETL Jobs
+
+on:
+  push:
+    branches:
+      - main
+      - release
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set environment
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            echo "PROJECT_ID=${{ secrets.GCP_DEPLOYER_DEV_KEY }}" >> $GITHUB_ENV
+            echo "TARGET=dev" >> $GITHUB_ENV
+          else
+            echo "PROJECT_ID=${{ secrets.GCP_DEPLOYER_PROD_KEY }}" >> $GITHUB_ENV
+            echo "TARGET=prod" >> $GITHUB_ENV
+          fi
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build -t gcr.io/$PROJECT_ID/etl-runner .
+
+      - name: Push Docker image
+        run: |
+          docker push gcr.io/$PROJECT_ID/etl-runner
+
+      - name: Deploy jobs
+        run: |
+          python deploy_jobs.py \
+            --project $PROJECT_ID \
+            --target $TARGET

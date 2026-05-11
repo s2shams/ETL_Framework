@@ -6,7 +6,6 @@ from etl_utils import send_email, get_owner_email
 def get_target():
     return os.getenv("TARGET", "dev")
 
-
 def parse_line(line: str):
     if ":" not in line:
         raise ValueError(f"Invalid step format: {line}")
@@ -21,7 +20,6 @@ def parse_line(line: str):
 
     return prefix, command, args
 
-
 def run_python(script_path, args):
     cmd = [
         "python",
@@ -32,7 +30,6 @@ def run_python(script_path, args):
 
     print("Running:", " ".join(cmd))
     return subprocess.run(cmd).returncode
-
 
 def run_dbt(model, args):
     cmd = [
@@ -46,7 +43,6 @@ def run_dbt(model, args):
 
     print("Running:", " ".join(cmd))
     return subprocess.run(cmd).returncode
-
 
 def run_job(job_name, file_path):
     email = get_owner_email(job_name)
