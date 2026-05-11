@@ -1,4 +1,7 @@
 google-cloud-bigquery
 google-cloud-storage
 dbt
+dbt-core
 dbt-bigquery
+vaderSentiment
+gcloud
