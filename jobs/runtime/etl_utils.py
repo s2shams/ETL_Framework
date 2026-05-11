@@ -4,7 +4,15 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_job_owners():
-    path = os.path.join(BASE_DIR, "jobs", "config", "job_owners.json")
+    path = os.path.join(
+        BASE_DIR,
+        "..",
+        "config",
+        "job_owners.json"
+    )
+
+    path = os.path.abspath(path)
+
     with open(path) as f:
         return json.load(f)
 

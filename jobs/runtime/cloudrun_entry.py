@@ -1,5 +1,5 @@
 import sys
-from job_runner import run_job
+from jobs.runtime.job_runner import run_job
 
 def main():
     if len(sys.argv) < 2:

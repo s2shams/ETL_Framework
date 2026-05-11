@@ -45,6 +45,6 @@ jobs:
 
       - name: Deploy jobs
         run: |
-          python deploy_jobs.py \
+          python jobs/runtime/deploy_jobs.py \
             --project $PROJECT_ID \
             --target $TARGET
