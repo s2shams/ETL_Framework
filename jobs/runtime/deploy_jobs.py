@@ -20,7 +20,7 @@ def load_config():
 
     config_path = os.path.join(
         base_dir,
-        "jobs",
+        "..",
         "config",
         "jobs_config.json"
     )

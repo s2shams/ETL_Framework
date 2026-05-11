@@ -8,4 +8,4 @@ COPY . /app
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENTRYPOINT ["python", "cloudrun_entry.py"]
+ENTRYPOINT ["python", "jobs/runtime/cloudrun_entry.py"]

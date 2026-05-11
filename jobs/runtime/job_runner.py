@@ -1,7 +1,7 @@
 import sys
 import subprocess
 import os
-from etl_utils import send_email, get_owner_email
+from jobs.runtime.etl_utils import send_email, get_owner_email
 
 def get_target():
     return os.getenv("TARGET", "dev")
@@ -28,7 +28,7 @@ def run_python(script_path, args):
         get_target()
     ] + args
 
-    print("Running:", " ".join(cmd))
+    print("Running:", " ".join(cmd), flush=True)
     return subprocess.run(cmd).returncode
 
 def run_dbt(model, args):
@@ -41,7 +41,7 @@ def run_dbt(model, args):
         get_target()
     ] + args
 
-    print("Running:", " ".join(cmd))
+    print("Running:", " ".join(cmd), flush=True)
     return subprocess.run(cmd).returncode
 
 def run_job(job_name, file_path):
@@ -50,7 +50,7 @@ def run_job(job_name, file_path):
     with open(file_path) as f:
         steps = [line.strip() for line in f if line.strip()]
 
-    print(f"Starting job: {job_name} | TARGET={get_target()}")
+    print(f"Starting job: {job_name} | TARGET={get_target()}", flush=True)
 
     for step in steps:
         prefix, command, args = parse_line(step)
@@ -65,11 +65,11 @@ def run_job(job_name, file_path):
             raise ValueError(f"Unknown step type: {prefix}")
 
         if exit_code != 0:
-            print(f"\nFAILED STEP: {step}")
+            print(f"\nFAILED STEP: {step}", flush=True)
 
             if email:
                 send_email(job_name, step, email)
 
             sys.exit(exit_code)
 
-    print(f"Job {job_name} completed successfully")
+    print(f"Job {job_name} completed successfully", flush=True)
