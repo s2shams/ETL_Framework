@@ -27,9 +27,11 @@ jobs:
           if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
             echo "PROJECT_ID=${{ secrets.GCP_PROJECT_ID_DEV }}" >> $GITHUB_ENV
             echo "TARGET=dev" >> $GITHUB_ENV
+            echo "SA_EMAIL=${{ secrets.SA_EMAIL_DEV }}" >> $GITHUB_ENV
           else
             echo "PROJECT_ID=${{ secrets.GCP_PROJECT_ID_PROD }}" >> $GITHUB_ENV
             echo "TARGET=prod" >> $GITHUB_ENV
+            echo "SA_EMAIL=${{ secrets.SA_EMAIL_PROD }}" >> $GITHUB_ENV
           fi
 
       - name: Configure Docker auth
