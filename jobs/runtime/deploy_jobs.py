@@ -33,6 +33,12 @@ def deploy_job(job_name, config, project_id, target):
 
     cpu = config.get("cpu", "1")
     memory = config.get("memory", "1Gi")
+    schedule = config.get("schedule", None)
+    sa_email = os.getenv("SA_EMAIL")
+
+    if sa_email is None:
+        print("Error: SA_EMAIL env variable not correctly set.")
+        exit(1)
 
     image = f"gcr.io/{project_id}/{IMAGE_NAME}"
 
@@ -43,7 +49,8 @@ def deploy_job(job_name, config, project_id, target):
         "--cpu", cpu,
         "--memory", memory,
         "--args", job_name,
-        "--set-env-vars", f"TARGET={target}"
+        "--set-env-vars", f"TARGET={target}",
+        "--service-account", sa_email
     ]
 
     create_cmd = [
@@ -53,7 +60,8 @@ def deploy_job(job_name, config, project_id, target):
         "--cpu", cpu,
         "--memory", memory,
         "--args", job_name,
-        "--set-env-vars", f"TARGET={target}"
+        "--set-env-vars", f"TARGET={target}",
+        "--service-account", sa_email
     ]
 
     print(f"\nDeploying job: {job_name}", flush=True)
@@ -63,6 +71,40 @@ def deploy_job(job_name, config, project_id, target):
     if result.returncode != 0:
         print(f"Job {job_name} not found, creating...", flush=True)
         subprocess.run(create_cmd, check=True)
+
+    # create/update scheduler now
+    if schedule:
+        uri = f"https://run.googleapis.com/v2/projects/{project_id}/locations/{REGION}/jobs/{job_name}:run"
+        
+        update_scheduler_cmd = [
+            gcloud, "scheduler", "jobs", "update", "http",
+            f"{job_name}-schedule",
+            "--location", REGION,
+            "--schedule", schedule,
+            "--uri", uri,
+            "--http-method", "POST",
+            "--oauth-service-account-email", sa_email,
+            "--time-zone", "America/Toronto"
+        ]
+
+        create_scheduler_cmd = [
+            gcloud, "scheduler", "jobs", "create", "http",
+            f"{job_name}-schedule",
+            "--location", REGION,
+            "--schedule", schedule,
+            "--uri", uri,
+            "--http-method", "POST",
+            "--oauth-service-account-email", sa_email,
+            "--time-zone", "America/Toronto"
+        ]
+
+        print(f"Deploying scheduler for {job_name}", flush=True)
+
+        result = subprocess.run(update_scheduler_cmd)
+
+        if result.returncode != 0:
+            print(f"Scheduler for {job_name} not found, creating...",flush=True)
+            subprocess.run(create_scheduler_cmd, check=True)
 
 def main():
     parser = argparse.ArgumentParser()
