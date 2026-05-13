@@ -2,6 +2,7 @@
     "reddit-ingestion": {
         "cpu": "2",
         "memory": "2Gi",
-        "schedule": "0 2 * * *"
+        "schedule": "0 2 * * *",
+        "timeout": "6h"
     }
 }

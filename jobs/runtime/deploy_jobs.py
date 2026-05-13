@@ -34,6 +34,8 @@ def deploy_job(job_name, config, project_id, target):
     cpu = config.get("cpu", "1")
     memory = config.get("memory", "1Gi")
     schedule = config.get("schedule", None)
+    timeout = config.get("timeout", "10m") # 10 minutes is the default timeout
+    retries = config.get("retries", "0") # 0 retries is the default max
     sa_email = os.getenv("SA_EMAIL")
 
     if sa_email is None:
@@ -50,7 +52,9 @@ def deploy_job(job_name, config, project_id, target):
         "--memory", memory,
         "--args", job_name,
         "--set-env-vars", f"TARGET={target}",
-        "--service-account", sa_email
+        "--service-account", sa_email,
+        "--task-timeout", timeout,
+        "--max-retries", retries
     ]
 
     create_cmd = [
@@ -61,7 +65,9 @@ def deploy_job(job_name, config, project_id, target):
         "--memory", memory,
         "--args", job_name,
         "--set-env-vars", f"TARGET={target}",
-        "--service-account", sa_email
+        "--service-account", sa_email,
+        "--task-timeout", timeout,
+        "--max-retries", retries
     ]
 
     print(f"\nDeploying job: {job_name}", flush=True)
