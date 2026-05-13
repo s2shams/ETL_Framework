@@ -1,17 +1,36 @@
 # Config for reddit ingestion
+from google.cloud import bigquery
 
 # Subreddit(s) to ingest
 SUBREDDITS = [
     'uwaterloo',
     'Genshin_Impact',
-    'XiaoMains',
-    'ArlecchinoMains',
-    'HollowKnight',
-    'Kingdom',
-    'Ford'
+    'Genshin_Impact_Leaks',
+    'anime',
+    'manga',
+    'Ford',
+    'dataengineering',
+    'learnmachinelearning',
+    'canadaexpressentry',
+    'ClashRoyale',
+    'UofT',
+    'waterloo',
+    'askTO',
+    'cscareerquestions',
+    'kitchener'
 ]
 
 INGEST_FLOW_NAME = 'reddit_ingestion'
+LOAD_FLOW_NAME = 'reddit_staging'
+MERGE_FLOW_NAME = 'reddit_merge'
+TEMP_FILE = 'reddit_posts.ndjson'
+LOG_FREQUENCY = 2
+
+DATASET_NAME = 'common_property'
+TABLE_ID = f'{DATASET_NAME}.reddit_data'
+STAGING_TABLE_ID = f'{DATASET_NAME}_staging.reddit_data_staging'
+
+DEFAULT_DAYS_AGO = 8
 
 # Base API URL for reddit posts
 POSTS_API_URL = 'https://arctic-shift.photon-reddit.com/api/posts/search'
@@ -61,4 +80,48 @@ COMMENT_FIELDS = [
 ]
 
 # Schema mapping for final BigQuery table
-# tbd
+SCHEMA = [
+    bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("subreddit", "STRING"),
+    bigquery.SchemaField("subreddit_id", "STRING"),
+    bigquery.SchemaField("author", "STRING"),
+    bigquery.SchemaField("author_flair_text", "STRING"),
+    bigquery.SchemaField("link_flair_text", "STRING"),
+    bigquery.SchemaField("created_utc", "TIMESTAMP"),
+    bigquery.SchemaField("retrieved_on", "INTEGER"),
+    bigquery.SchemaField("title", "STRING"),
+    bigquery.SchemaField("selftext", "STRING"),
+    bigquery.SchemaField("sentiment_score", "FLOAT"),
+    bigquery.SchemaField("comments", "RECORD", mode="REPEATED", fields= [
+        bigquery.SchemaField("id", "STRING"),
+        bigquery.SchemaField("link_id", "STRING"),
+        bigquery.SchemaField("parent_id", "STRING"),
+        bigquery.SchemaField("subreddit", "STRING"),
+        bigquery.SchemaField("subreddit_id", "STRING"),
+        bigquery.SchemaField("author", "STRING"),
+        bigquery.SchemaField("author_flair_css_class", "STRING"),
+        bigquery.SchemaField("author_flair_text", "STRING"),
+        bigquery.SchemaField("created_utc", "INTEGER"),
+        bigquery.SchemaField("retrieved_on", "INTEGER"),
+        bigquery.SchemaField("body", "STRING"),
+        bigquery.SchemaField("downs", "INTEGER"),
+        bigquery.SchemaField("ups", "INTEGER"),
+        bigquery.SchemaField("score", "INTEGER"),
+        bigquery.SchemaField("sentiment_score", "FLOAT"),
+        bigquery.SchemaField("replies", "JSON", mode="REPEATED")
+    ])
+]
+
+LOAD_CONFIG = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            schema=SCHEMA,
+            autodetect=False,
+            ignore_unknown_values=True,
+            write_disposition="WRITE_APPEND",
+            create_disposition="CREATE_IF_NEEDED",
+            time_partitioning=bigquery.TimePartitioning(
+                type_=bigquery.TimePartitioningType.DAY,
+                field="created_utc"
+            )
+        )
+

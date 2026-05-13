@@ -2,9 +2,12 @@ from .etllogger import get_logger
 import os
 import datetime
 from google.cloud import bigquery
+import psutil
+
 from .etlconfig import (
     get_project_id,
-    get_BQ_client
+    get_BQ_client,
+    MEM_WARNING_THRESHOLD
 )
 logger = get_logger(__name__)
 _client = None
@@ -24,7 +27,7 @@ def get_client():
         _client = get_BQ_client(target)
     return _client
 
-def load_data_to_BQ(destDatasetName, destTableName, queryName, query_dir=query_dir, project_id=project_id, write_disposition='WRITE_APPEND', job_config=None):
+def load_data_to_BQ(destDatasetName, destTableName, queryName, query_dir=query_dir, project_id=project_id, write_disposition='WRITE_APPEND', job_config=None, merge_query=False):
     """Execute a parameterized SQL query and load its results into BigQuery.
 
     Reads a SQL file from `query_dir`, substitutes placeholder values for the
@@ -41,7 +44,7 @@ def load_data_to_BQ(destDatasetName, destTableName, queryName, query_dir=query_d
         job_config: Optional BigQuery job configuration.
     """
     client = get_client()
-    query_path = os.path.join(query_dir, queryName)
+    query_path = os.path.join(query_dir, f'{queryName}.sql')
     
     with open(query_path, 'r') as f:
         query = f.read()
@@ -51,14 +54,15 @@ def load_data_to_BQ(destDatasetName, destTableName, queryName, query_dir=query_d
     
     if job_config is None:
         job_config = bigquery.QueryJobConfig()
-        job_config.write_disposition = write_disposition
+        if not merge_query:
+            job_config.write_disposition = write_disposition
     
     try:
         query_job = client.query(query, job_config=job_config)
         query_job.result() # Wait for the job to complete
 
         num_rows = query_job.num_dml_affected_rows if query_job.num_dml_affected_rows is not None else 'N/A'
-        time_taken = query_job.ended - query_job.started
+        time_taken = (query_job.ended - query_job.started).total_seconds()
         logger.success(f'Successfully loaded data to {destDatasetName}.{destTableName}. Rows affected: {num_rows}, Time taken: {time_taken:.2f}')
 
         return query_job
@@ -151,3 +155,57 @@ def update_processing_status(data_flow_name, etl_datetime):
     except Exception as e:
         logger.error(f'Error occurred while updating processing status for "{data_flow_name}": {e}')
         raise
+
+def log_memory_usage(msg, silent=False):
+    mem = psutil.virtual_memory()
+    total = mem.total / (1024 ** 2)
+    available = mem.available / (1024 ** 2)
+    used = mem.used / (1024 ** 2)
+
+    if not silent:
+        logger.info(f"Memory usage: {msg}")
+        print(
+            f"Total Memory: {total:.2f} MB | "
+            f"Used Memory: {used:.2f} MB ({mem.percent:.2f}%) | "
+            f"Available: {available:.2f} MB"
+        )
+    
+    if mem.percent >= MEM_WARNING_THRESHOLD:
+        return 'warning'
+    else:
+        return 'normal'
+    
+def load_ndjson_to_BQ(path, table_id, job_config):
+    client = get_client()
+
+    try:
+        with open(path, "rb") as f:
+            job = client.load_table_from_file(f, table_id, job_config=job_config)
+        job.result()
+        logger.info("Sucessfully loaded file to BQ")
+    except Exception as e:
+        logger.error(f"Failed to upload file to BQ: {e}")
+        raise
+
+def if_tbl_exists(table_id):
+    client = get_client()
+
+    try:
+        client.get_table(table_id)
+        return True
+    except Exception:
+        return False
+
+def truncate_tbl(table_id):
+    client = get_client()
+
+    if not if_tbl_exists(table_id):
+        logger.warning(f"Cannot truncate {table_id}, as it does not exists")
+        return
+    
+    query = f"""
+    TRUNCATE TABLE {table_id}
+    """
+    job = client.query(query)
+    job.result()
+

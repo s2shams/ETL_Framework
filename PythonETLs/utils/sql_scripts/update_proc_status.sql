@@ -1,3 +1,3 @@
 UPDATE `common_property.processing_status`
-SET etl_datetime = 'ETL_DATETIME'
+SET etl_datetime = DATETIME('ETL_DATETIME')
 WHERE data_flow_name = 'DATA_FLOW_NAME'

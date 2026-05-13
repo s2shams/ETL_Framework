@@ -4,6 +4,8 @@ EMAIL_LIST = [
     's2shams@uwaterloo.ca'
 ]
 
+MEM_WARNING_THRESHOLD = 70
+
 def get_project_id(target):
     if target == 'dev':
         return 'ingestion-dev-495504'
