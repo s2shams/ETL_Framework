@@ -1,4 +1,3 @@
-import json
 from config import POSTS_API_URL, COMMENTS_API_URL, POST_FIELDS, COMMENT_FIELDS, POST_BATCH_SIZE, COMMENT_BATCH_SIZE, MAX_API_RETRIES
 import requests
 from datetime import datetime, timezone
@@ -21,14 +20,12 @@ def build_comments_request(post_id, url=COMMENTS_API_URL, limit=COMMENT_BATCH_SI
 
 # Used for api pagination to get the next batch of posts/comments
 # May not need to use, can directly use the epoch time of last post to get, but may be useful for logging
-def convert_epoch_to_ISO8601(epoch_time):
-    dt_utc = datetime.fromtimestamp(epoch_time, tz=timezone.utc)
-    iso_string = dt_utc.isoformat()
-    return iso_string
+def epoch_to_timestamp(epoch):
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 # Make API request with retries and exponential backoff
 def make_api_request(url, max_retries=MAX_API_RETRIES, logger=None):
-    base_delay = 1 # Base delay in seconds for exponential backoff
+    base_delay = 15 # Base delay in seconds for exponential backoff
     max_delay = 60 # Max delay in seconds for exponential backoff
 
     for attempt in range(max_retries):
@@ -36,9 +33,13 @@ def make_api_request(url, max_retries=MAX_API_RETRIES, logger=None):
             response = requests.get(url)
             response.raise_for_status() # Raise an exception for HTTP errors
             return response.json() # Return the JSON response if successful
+
         except requests.exceptions.RequestException as e:
-            delay = min(max_delay, base_delay * (2 ** attempt))
-            sleep_time = random.uniform(0, delay) # Add jitter to avoid thundering herd problem
+            if attempt == 0:
+                sleep_time = base_delay
+            else:
+                delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+                sleep_time = random.uniform(0, delay) # Add jitter to avoid thundering herd problem
 
             if logger:
                 logger.warning(f'API request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {sleep_time:.2f} seconds...')
@@ -72,8 +73,10 @@ def process_comment(comment, logger=None, level=0):
     processed_comment.get('replies', [])
     
     # if a top-level comment has no replies, the API returns an empty string
-    if isinstance(processed_comment['replies'], str):
-        processed_comment['replies'] = None
+    if isinstance(processed_comment['replies'], str) or processed_comment['replies'] is None:
+        processed_comment['replies'] = []
+    elif isinstance(processed_comment['replies'], list):
+        processed_comment['replies'] = processed_comment['replies'] # for safety
     # if a comment has replies, it is stored as a dict which contains a 'data.children' field which is a list of replies with the same structure as comments
     elif isinstance(processed_comment['replies'], dict):
         replies_data = processed_comment['replies'].get('data', {}).get('children', [])
@@ -84,9 +87,11 @@ def process_comment(comment, logger=None, level=0):
 # Process the response JSON to extract relevant fields and structure the data as needed for our database schema
 def process_response_json(response_json, logger=None):
     data = response_json.get('data', [])
+    num_posts = len(data)
+    num_comments = 0
     
     for post in data:
-
+        post['created_utc'] = epoch_to_timestamp(post['created_utc']) # for TIMESTAMP partitioning
         # for each post, get the comments and add to the post data
         post_id = post.get('id')
         comment_request_url = build_comments_request(post_id)
@@ -96,7 +101,7 @@ def process_response_json(response_json, logger=None):
 
             # process each comment first by recursively processing replies and pulling fields that we want
             processed_comments = [process_comment(comment, logger=logger, level=0) for comment in comment_data] or None
-            
+            num_comments += len(processed_comments or [])
             post['comments'] = processed_comments
 
             # Calculate sentiment score for the post title + selftext and add to post data
@@ -116,13 +121,5 @@ def process_response_json(response_json, logger=None):
         last_post = data[-1]
         last_post_created_utc = last_post.get('created_utc')
 
-    return data, last_post_created_utc
+    return data, last_post_created_utc, num_posts, num_comments
     
-## TEST CODE ##
-
-post_url = build_posts_request(after='2026-05-01T00:00:00Z', before='2026-05-07T00:00:00Z', subreddit='uwaterloo')
-response = make_api_request(post_url)
-batch_data, _ = process_response_json(response)
-
-with open('temp_response.json', 'w') as f:
-    json.dump(batch_data, f, indent=4)

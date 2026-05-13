@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.etlmodules import log_memory_usage, load_ndjson_to_BQ
 from utils.etllogger import get_logger
-from config import TABLE_ID, LOAD_CONFIG
+from config import STAGING_TABLE_ID, LOAD_CONFIG
 
 logger = get_logger(__name__)
 
@@ -38,8 +38,13 @@ class Gcs_writer:
     def rotate(self):
         self.file.close()
 
-        job_config = LOAD_CONFIG
-        load_ndjson_to_BQ(self.path, TABLE_ID, job_config)
-        os.remove(self.path)
+        try:
+            job_config = LOAD_CONFIG
+            load_ndjson_to_BQ(self.path, STAGING_TABLE_ID, job_config)
+        except Exception as e:
+            logger.error(f"Error occured while loading ndjson to {STAGING_TABLE_ID}: {e}")
+            raise
+        finally:
+            os.remove(self.path)
 
         self.file = open(self.path, 'a', encoding='utf-8')
