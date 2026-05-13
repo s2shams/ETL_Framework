@@ -1,4 +1,5 @@
 # Config for reddit ingestion
+from google.cloud import bigquery
 
 # Subreddit(s) to ingest
 SUBREDDITS = [
@@ -12,6 +13,13 @@ SUBREDDITS = [
 ]
 
 INGEST_FLOW_NAME = 'reddit_ingestion'
+LOAD_FLOW_NAME = 'reddit_staging'
+MERGE_FLOW_NAME = 'reddit_merge'
+TEMP_FILE = 'reddit_posts.ndjson'
+LOG_FREQUENCY = 2
+
+DATASET_NAME = 'reddit'
+TABLE_ID = f'{DATASET_NAME}.reddit_data'
 
 # Base API URL for reddit posts
 POSTS_API_URL = 'https://arctic-shift.photon-reddit.com/api/posts/search'
@@ -61,4 +69,16 @@ COMMENT_FIELDS = [
 ]
 
 # Schema mapping for final BigQuery table
-# tbd
+SCHEMA = [
+    bigquery.SchemaField("id", "STRING"),
+]
+
+LOAD_CONFIG = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            schema=SCHEMA,
+            autodetect=False,
+            ignore_unknown_values=True,
+            write_disposition="WRITE_APPEND",
+            create_disposition="CREATE_IF_NEEDED"
+        )
+

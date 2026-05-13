@@ -2,9 +2,12 @@ from .etllogger import get_logger
 import os
 import datetime
 from google.cloud import bigquery
+import psutil
+
 from .etlconfig import (
     get_project_id,
-    get_BQ_client
+    get_BQ_client,
+    MEM_WARNING_THRESHOLD
 )
 logger = get_logger(__name__)
 _client = None
@@ -151,3 +154,35 @@ def update_processing_status(data_flow_name, etl_datetime):
     except Exception as e:
         logger.error(f'Error occurred while updating processing status for "{data_flow_name}": {e}')
         raise
+
+def log_memory_usage(msg, silent=False):
+    mem = psutil.virtual_memory()
+    total = mem.total / (1024 ** 2)
+    available = mem.available / (1024 ** 2)
+    used = mem.used / (1024 ** 2)
+
+    if not silent:
+        logger.info(f"Memory usage: {msg}")
+        print(
+            f"Total Memory: {total:.2f} MB | "
+            f"Used Memory: {used:.2f} MB ({mem.percent:.2f}%) | "
+            f"Available: {available:.2f} MB"
+        )
+    
+    if mem.percent >= MEM_WARNING_THRESHOLD:
+        return 'warning'
+    else:
+        return 'normal'
+    
+def load_ndjson_to_BQ(path, table_id, job_config):
+    client = get_client()
+
+    try:
+        with open(path, "rb") as f:
+            job = client.load_table_from_file(f, table_id, job_config=job_config)
+        job.result()
+        logger.info("Sucessfully loaded file to BQ")
+    except Exception as e:
+        logger.error(f"Failed to upload file to BQ: {e}")
+    
+    

@@ -13,6 +13,8 @@ from utils.etlmodules import (
     check_flow_exists,
     get_last_run_time,
     update_processing_status,
+    log_memory_usage,
+    load_ndjson_to_BQ
 )
 from utils.etllogger import get_logger
 
@@ -35,10 +37,15 @@ from api_utils import (
 from config import (
     SUBREDDITS,
     MAX_THREADS,
-    INGEST_FLOW_NAME
+    INGEST_FLOW_NAME,
+    TEMP_FILE,
+    LOG_FREQUENCY,
+    TABLE_ID,
+    LOAD_CONFIG
 )
 
-TEMP_FILE = 'reddit_posts.ndjson'
+from gcs_writer import Gcs_writer
+
 # ------------- ETL specific imports --------------
 
 # parse command line arguments
@@ -48,10 +55,9 @@ parser.add_argument('--end_time', type=str, default=None, help='Optional end tim
 args = parser.parse_args()
 
 # Function to ingest data for a single subreddit given a time range
-def ingest_subreddit(subreddit, start_time, end_time, file_handle):
+def ingest_subreddit(subreddit, start_time, end_time, loop_counter, writer):
     after = start_time
     before = end_time
-    temp_file = f'{subreddit}.ndjson' # temporary file to store raw json response from API for this subreddit
 
     while True:
         request = build_posts_request(after, before, subreddit)
@@ -61,11 +67,13 @@ def ingest_subreddit(subreddit, start_time, end_time, file_handle):
         if not batch_data:
             logger.info(f'No more posts to ingest for subreddit: {subreddit}')
             break
-
-        for post in batch_data:
-            file_handle.write(json.dumps(post) + '\n')
         
-        file_handle.flush()
+        loop_counter += 1
+        if loop_counter > 0 and loop_counter % LOG_FREQUENCY == 0:
+            log_memory_usage(f"After {loop_counter} API calls")
+
+        writer.write_batch(batch_data)
+        return loop_counter
 
 def ingest_reddit():
     lastETLdate = get_last_run_time(INGEST_FLOW_NAME)
@@ -84,13 +92,18 @@ def ingest_reddit():
     end_time = ETLcutofftime.strftime('%Y-%m-%dT%H:%M:%SZ')
     logger.info(f'Starting to ingest reddit data between time range: {start_time} to {end_time}')
 
-    # open 1 temp file for all subreddits (maybe consider multiple files, but currently the data volume isn't high enough to justify)
-    with open(TEMP_FILE, 'a') as f:
-        # this will later be multithreaded (each thread writes to a queue managed by another thread, that thread writes to the temp file)
-        for subreddit in SUBREDDITS:
-            logger.info(f'Starting ingestion for subreddit: {subreddit}')
-            ingest_subreddit(subreddit, start_time, end_time, f)
-            logger.info(f'Finished ingestion for subreddit: {subreddit}')
+    loop_counter = 0
+    writer = Gcs_writer(TEMP_FILE)
+
+    logger.info(f"Subreddits being ingested: {SUBREDDITS}")
+    for subreddit in SUBREDDITS:
+        loop_counter = ingest_subreddit(subreddit, start_time, end_time, loop_counter, writer)
+    
+    writer.close()
+    logger.info("All subreddits have been ingested. Proceeding to final chunk if present")
+    if os.path.exists(TEMP_FILE) and os.path.getsize(TEMP_FILE) > 0:
+        load_ndjson_to_BQ(TEMP_FILE, TABLE_ID, LOAD_CONFIG)
+        os.remove(TEMP_FILE)
 
 ingest_reddit()
     
