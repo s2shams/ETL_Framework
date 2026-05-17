@@ -39,7 +39,7 @@ def make_api_request(url, max_retries=MAX_API_RETRIES, logger=None):
                 sleep_time = base_delay
             else:
                 delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
-                sleep_time = random.uniform(0, delay) # Add jitter to avoid thundering herd problem
+                sleep_time = random.uniform(base_delay, delay) # Add jitter to avoid thundering herd problem
 
             if logger:
                 logger.warning(f'API request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {sleep_time:.2f} seconds...')

@@ -17,14 +17,23 @@ SUBREDDITS = [
     'waterloo',
     'askTO',
     'cscareerquestions',
-    'kitchener'
+    'kitchener',
+    'hiringcafe',
+    'jobs',
+    'internships',
+    'PersonalFinanceCanada',
+    'Layoffs',
+    'SipsTea',
+    'ontario',
+    'technology',
+    'news'
 ]
 
 INGEST_FLOW_NAME = 'reddit_ingestion'
 LOAD_FLOW_NAME = 'reddit_staging'
 MERGE_FLOW_NAME = 'reddit_merge'
 TEMP_FILE = 'reddit_posts.ndjson'
-LOG_FREQUENCY = 2
+LOG_FREQUENCY = 10
 
 DATASET_NAME = 'common_property'
 TABLE_ID = f'{DATASET_NAME}.reddit_data'
